@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use either::Either;
 use itertools::Itertools;
-use log::debug;
+use log::{debug, info};
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -16,6 +16,68 @@ use crate::{
     pcs::{PCSNode, Revision},
     settings::DisplaySettings,
 };
+
+//Three structs for debug log
+#[derive(Debug)]
+pub enum MergeChunk<'a> {
+    Stable(ChunkData<'a>),
+    Unstable(ChunkData<'a>),
+}
+
+#[derive(Debug, Default)]
+pub struct ChunkData<'a> {
+    pub left_nodes: Vec<&'a AstNode<'a>>,
+    pub base_nodes: Vec<&'a AstNode<'a>>,
+    pub right_nodes: Vec<&'a AstNode<'a>>,
+}
+
+impl<'a> ChunkData<'a> {
+    pub fn is_empty(&self) -> bool {
+        self.left_nodes.is_empty() && self.base_nodes.is_empty() && self.right_nodes.is_empty()
+    }
+}
+
+// Estado para manter o log durante a recursão
+#[derive(Debug, Default)]
+struct LogState<'a> {
+    log: Vec<MergeChunk<'a>>,
+    current_stable: ChunkData<'a>,
+    current_unstable: ChunkData<'a>,
+}
+
+// Helper para formatar o log
+fn format_node_list_detailed(nodes: &Vec<&AstNode>) -> String {
+    if nodes.is_empty() {
+        return "-".to_string();
+    }
+    let first_node = nodes.first().unwrap();
+    let last_node = nodes.last().unwrap();
+    
+    let start_line = first_node.start_point.row + 1;
+    let end_line = last_node.end_point.row + 1;
+    
+    let range = if start_line == end_line {
+        format!("(L{})", start_line)
+    } else {
+        format!("(L{}-L{})", start_line, end_line)
+    };
+    const MAX_NODES_TO_SHOW: usize = 3;
+    const MAX_CONTENT_LEN: usize = 25;
+    let descriptions: Vec<String> = nodes.iter().map(|n| {
+        let mut content = n.source.replace(['\n', '\r'], " ").trim().to_string();
+        if content.len() > MAX_CONTENT_LEN {
+            content.truncate(MAX_CONTENT_LEN - 3);
+            content.push_str("...");
+        }
+        format!("{}: '{}'", n.grammar_name, content)
+    }).take(MAX_NODES_TO_SHOW).collect();
+    let mut summary = format!("[{}]", descriptions.join(", "));
+    if nodes.len() > MAX_NODES_TO_SHOW {
+        summary.push_str("...");
+    }
+    
+    format!("{} nós {} {}", nodes.len(), range, summary)
+}
 
 /// An internal structure to map a parent and a predecessor to a possible successor in each revision
 struct SuccessorMap<'a> {
@@ -51,6 +113,7 @@ pub struct TreeBuilder<'a, 'b> {
     base_successors: SuccessorMap<'a>,
     class_mapping: &'b ClassMapping<'a>,
     settings: &'b DisplaySettings<'a>,
+    print_chunks: bool,
 }
 
 /// Variable state, keeping track of visited nodes to avoid looping
@@ -75,12 +138,14 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         base_changeset: &ChangeSet<'a>,
         class_mapping: &'b ClassMapping<'a>,
         settings: &'b DisplaySettings<'a>,
+        print_chunks: bool,
     ) -> Self {
         TreeBuilder {
             merged_successors: SuccessorMap::new(merged_changeset),
             base_successors: SuccessorMap::new(base_changeset),
             class_mapping,
             settings,
+            print_chunks,
         }
     }
 
@@ -93,10 +158,35 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
             visited_nodes: HashSet::new(),
         };
 
+        let mut log_state = if self.print_chunks { Some(LogState::default()) } else { None };
+
         // recursively build the tree by starting from the virtual root
-        let merged_tree = self.build_subtree(PCSNode::VirtualRoot, &mut visiting_state)?;
+        let merged_tree = self.build_subtree(PCSNode::VirtualRoot, &mut visiting_state, &mut log_state)?;
 
         debug!("{merged_tree}");
+
+        if let Some(final_log_state) = log_state {
+            info!("\n--- MERGIRAF CHUNK DEBUG LOG ---");
+            info!("===========================================================");
+            for (i, chunk) in final_log_state.log.iter().enumerate() {
+                match chunk {
+                    MergeChunk::Stable(data) => {
+                        info!("-- stable chunk #{} --", i + 1);
+                        info!("    Left (L):  {}", format_node_list_detailed(&data.left_nodes));
+                        info!("    Base (B):  {}", format_node_list_detailed(&data.base_nodes));
+                        info!("    Right (R): {}", format_node_list_detailed(&data.right_nodes));
+                    }
+                    MergeChunk::Unstable(data) => {
+                        info!("-- unstable chunk #{} --", i + 1);
+                        info!("    Left (L):  {}", format_node_list_detailed(&data.left_nodes));
+                        info!("    Base (B):  {}", format_node_list_detailed(&data.base_nodes));
+                        info!("    Right (R): {}", format_node_list_detailed(&data.right_nodes));
+                    }
+                }
+                info!("-----------------------------------------------------------");
+            }
+            info!("--- END MERGIRAF CHUNK DEBUG LOG ---\n");
+        }
 
         let deleted_and_modified = visiting_state.deleted_and_modified;
         // check if any deleted and modified nodes are absent from the resulting tree
@@ -110,18 +200,13 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
             .collect();
         debug!("really deleted children: {}", deleted.iter().format(", "));
 
-        let parents_to_recompute: HashSet<Leader<'a>> = deleted_and_modified
-            .into_iter()
+        let parents_to_recompute: HashSet<Leader<'a>> = deleted_and_modified.into_iter()
             .filter(|deleted| !merged_tree.contains(deleted, self.class_mapping))
             .map(|deleted| {
-                let RevNode { rev, node } = deleted.as_representative();
-                self.class_mapping.map_to_leader(RevNode::new(
-                    rev,
-                    node.parent().expect(
-                        "the root node is marked as deleted and modified, \
-                        but all roots should be mapped together",
-                    ),
-                ))
+                let RevNode{rev,node} = deleted.as_representative();
+                self.class_mapping.map_to_leader(
+                    RevNode::new(rev, node.parent().expect("the root node is marked as deleted and modified, but all roots should be mapped together"))
+                )
             })
             .collect();
         debug!(
@@ -142,6 +227,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         &'b self,
         node: PCSNode<'a>,
         visiting_state: &mut VisitingState<'a>,
+        log_state: &mut Option<LogState<'a>>,
     ) -> Result<MergedTree<'a>, String> {
         if let PCSNode::Node { node, .. } = node {
             let visited = &mut visiting_state.visited_nodes;
@@ -150,7 +236,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
             }
             visited.insert(node);
         }
-        let result = self.build_subtree_from_changeset(node, visiting_state);
+        let result = self.build_subtree_from_changeset(node, visiting_state, log_state);
         if let PCSNode::Node { node, .. } = node {
             visiting_state.visited_nodes.remove(&node);
         }
@@ -163,6 +249,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         &'b self,
         node: PCSNode<'a>,
         visiting_state: &mut VisitingState<'a>,
+        log_state: &mut Option<LogState<'a>>,
     ) -> Result<MergedTree<'a>, String> {
         // if the node has isomorphic subtrees in all revisions, that's very boring,
         // so we just return a tree that matches that
@@ -207,10 +294,17 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
             match cursor.len() {
                 0 => {
                     // unexpected, this is a nasty conflict!
-                    return self.commutative_or_line_based_local_fallback(node, visiting_state);
+                    return self.commutative_or_line_based_local_fallback(node, visiting_state, log_state);
                 }
                 1 => {
                     // only a single successor, great
+
+                    if let Some(ls) = log_state.as_mut(){
+                        if !ls.current_unstable.is_empty(){
+                            ls.log.push(MergeChunk::Unstable(std::mem::take(&mut ls.current_unstable)));
+                        }
+                    }
+
                     let (_, current_child) = cursor
                         .iter()
                         .next()
@@ -222,16 +316,34 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                     if seen_nodes.contains(&current_child) {
                         // there is a loop of children: abort and fall back on line diffing
                         let line_diff =
-                            self.commutative_or_line_based_local_fallback(node, visiting_state);
+                            self.commutative_or_line_based_local_fallback(node, visiting_state, log_state);
                         return line_diff;
                     }
 
-                    let subtree = self.build_subtree(current_child, visiting_state);
+                    if let (Some(ls), PCSNode::Node{ node: leader, revisions }) = (log_state.as_mut(), current_child) {
+                        if revisions.contains(Revision::Left) {
+                            if let Some(n) = self.class_mapping.node_at_rev(&leader, Revision::Left) {
+                                ls.current_stable.left_nodes.push(n);
+                            }
+                        }
+                        if revisions.contains(Revision::Base) {
+                            if let Some(n) = self.class_mapping.node_at_rev(&leader, Revision::Base) {
+                                ls.current_stable.base_nodes.push(n);
+                            }
+                        }
+                        if revisions.contains(Revision::Right) {
+                            if let Some(n) = self.class_mapping.node_at_rev(&leader, Revision::Right) {
+                                ls.current_stable.right_nodes.push(n);
+                            }
+                        }
+                    }
+
+                    let subtree = self.build_subtree(current_child, visiting_state, log_state);
                     let Ok(child_result_tree) = subtree else {
                         // we failed to build the result tree for a child of this node, because of a nasty conflict.
                         // We fall back on line diffing
                         let line_diff =
-                            self.commutative_or_line_based_local_fallback(node, visiting_state);
+                            self.commutative_or_line_based_local_fallback(node, visiting_state, log_state);
                         return line_diff;
                     };
                     children.push(child_result_tree);
@@ -240,6 +352,12 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                     cursor = children_map.get(&predecessor);
                 }
                 2 => {
+                    if let Some(ls) = log_state.as_mut(){
+                        if !ls.current_stable.is_empty() {
+                            ls.log.push(MergeChunk::Stable(std::mem::take(&mut ls.current_stable)));
+                        }
+                    }
+
                     let Ok((next_cursor, conflict)) = self.build_conflict(
                         predecessor,
                         children_map,
@@ -248,7 +366,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                         visiting_state,
                     ) else {
                         let line_based =
-                            self.commutative_or_line_based_local_fallback(node, visiting_state);
+                            self.commutative_or_line_based_local_fallback(node, visiting_state, log_state);
                         return line_based;
                     };
 
@@ -256,6 +374,12 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                         unreachable!("`build_conflict` should return a conflict")
                     };
 
+                    if let Some(ls) = log_state.as_mut(){
+                        ls.current_unstable.base_nodes.extend(base.iter());
+                        ls.current_unstable.left_nodes.extend(left.iter());
+                        ls.current_unstable.right_nodes.extend(right.iter());
+                    }
+                    
                     if let PCSNode::Node { node: leader, .. } = node
                         && let Some(commutative_parent) = leader.commutative_parent_definition()
                     {
@@ -266,6 +390,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                             &right,
                             commutative_parent,
                             visiting_state,
+                            log_state
                         )?;
                         children.extend(solved_conflict);
                     } else {
@@ -279,6 +404,15 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                     cursor = next_cursor;
                 }
                 _ => unreachable!("unexpected conflict size: more than two diverging sides!"),
+            }
+        }
+
+        if let Some(ls) = log_state.as_mut(){
+            if !ls.current_stable.is_empty() {
+                ls.log.push(MergeChunk::Stable(std::mem::take(&mut ls.current_stable)));
+            }
+            if !ls.current_unstable.is_empty() {
+                ls.log.push(MergeChunk::Unstable(std::mem::take(&mut ls.current_unstable)));
             }
         }
 
@@ -303,7 +437,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 "{pad}{}",
                 non_base_nodes.difference(&seen_nodes).format(", ")
             );
-            return self.commutative_or_line_based_local_fallback(node, visiting_state);
+            return self.commutative_or_line_based_local_fallback(node, visiting_state, log_state);
         }
 
         // check that all base nodes that were not visited (deleted on one side) have not been changed on the other side
@@ -331,7 +465,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 continue; // node was deleted on both sides, we don't care about preserving any changes made to it
             };
             // recursively build the tree representation for the unvisited base node to see if it has any changes
-            self.build_subtree(unvisited_base_node, visiting_state)
+            self.build_subtree(unvisited_base_node, visiting_state, log_state)
                 .and_then(|base_tree| {
                     self.cover_modified_nodes(&base_tree, target_revision, modified_revision)
                         .ok_or_else(|| "no cover found".to_owned())
@@ -532,6 +666,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         &self,
         node: PCSNode<'a>,
         visiting_state: &mut VisitingState<'a>,
+        log_state: &mut Option<LogState<'a>>,
     ) -> Result<MergedTree<'a>, String> {
         let pad = visiting_state.indentation();
         debug!("{pad}{node} commutative_or_line_based_local_fallback");
@@ -543,7 +678,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         // If the root happens to be commutative, we can merge all children accordingly.
         if let Some(commutative_parent) = node.commutative_parent_definition()
             && let Ok(commutative_merge) =
-                self.commutatively_merge_children(&node, commutative_parent, visiting_state)
+                self.commutatively_merge_children(&node, commutative_parent, visiting_state, log_state)
         {
             Ok(MergedTree::new_mixed(node, commutative_merge))
         } else {
@@ -608,6 +743,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         right: &[&'a AstNode<'a>],
         commutative_parent: &CommutativeParent,
         visiting_state: &mut VisitingState<'a>,
+        log_state: &mut Option<LogState<'a>>,
     ) -> Result<Vec<MergedTree<'a>>, String> {
         let pad = visiting_state.indentation();
         debug!("{pad}commutatively_merge_lists");
@@ -686,6 +822,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                         node: revnode,
                     },
                     &mut removed_visiting_state,
+                    log_state,
                 )?;
                 Ok((revnode, subtree))
             })
@@ -716,6 +853,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                         node: *revnode,
                     },
                     visiting_state,
+                    log_state,
                 )
             })
             .collect::<Result<_, _>>()?;
@@ -817,6 +955,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         leader: &Leader<'a>,
         commutative_parent: &CommutativeParent,
         visiting_state: &mut VisitingState<'a>,
+        log_state: &mut Option<LogState<'a>>,
     ) -> Result<Vec<MergedTree<'a>>, String> {
         let children_base = self
             .class_mapping
@@ -885,6 +1024,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
             &right,
             commutative_parent,
             visiting_state,
+            log_state,
         )?;
         let mut prefix_trees: Vec<_> = common_prefix
             .iter()
@@ -895,6 +1035,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                         node: *revnode,
                     },
                     visiting_state,
+                    log_state,
                 )
             })
             .collect::<Result<_, _>>()?;
@@ -907,6 +1048,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                         node: *revnode,
                     },
                     visiting_state,
+                    log_state,
                 )
             })
             .collect::<Result<_, _>>()?;

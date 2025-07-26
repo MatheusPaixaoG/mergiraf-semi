@@ -21,6 +21,7 @@ pub fn resolve_merge_cascading<'a>(
     debug_dir: Option<&Path>,
     working_dir: &Path,
     language: Option<&str>,
+    print_chunks: bool,
 ) -> Result<MergeResult, String> {
     let mut solves = Vec::with_capacity(4);
 
@@ -44,7 +45,7 @@ pub fn resolve_merge_cascading<'a>(
         Ok(parsed_merge) => {
             settings.add_revision_names(&parsed_merge);
 
-            match resolve_merge(&parsed_merge, &settings, lang_profile, debug_dir) {
+            match resolve_merge(&parsed_merge, &settings, lang_profile, debug_dir, print_chunks) {
                 Ok(solve) if solve.conflict_count == 0 => {
                     info!("Solved all conflicts.");
                     debug!("Structured merge from reconstructed revisions.");
@@ -71,6 +72,7 @@ pub fn resolve_merge_cascading<'a>(
         debug_dir,
         working_dir,
         lang_profile,
+        print_chunks,
     ) {
         Ok(structured_merge) if structured_merge.conflict_count == 0 => {
             info!("Solved all conflicts.");
@@ -97,6 +99,7 @@ pub fn resolve_merge_cascading<'a>(
         working_dir,
         lang_profile,
         parsed.as_ref(),
+        print_chunks,
     ) {
         Some(Ok(merge)) if merge.conflict_count == 0 => {
             info!("Solved all conflicts.");
@@ -127,6 +130,7 @@ fn structured_merge_from_git_revisions(
     debug_dir: Option<&Path>,
     working_dir: &Path,
     lang_profile: &LangProfile,
+    print_chunks: bool,
 ) -> Result<MergeResult, FallbackMergeError> {
     let GitTempFiles { base, left, right } =
         extract_all_revisions_from_git(working_dir, fname_base)
@@ -151,6 +155,7 @@ fn structured_merge_from_git_revisions(
         settings,
         lang_profile,
         debug_dir,
+        print_chunks
     )
     .map_err(FallbackMergeError::MergeError)
 }
@@ -169,6 +174,7 @@ fn structured_merge_from_oid(
     working_dir: &Path,
     lang_profile: &LangProfile,
     parsed: Option<&ParsedMerge<'_>>,
+    print_chunks: bool,
 ) -> Option<Result<MergeResult, String>> {
     parsed
         .and_then(|p| p.extract_conflict_oids())
@@ -182,6 +188,7 @@ fn structured_merge_from_oid(
                 settings,
                 lang_profile,
                 debug_dir,
+                print_chunks,
             )
         })
 }

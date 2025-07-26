@@ -34,6 +34,7 @@ pub fn line_merge_and_structured_resolution(
     debug_dir: Option<&'static Path>,
     timeout: Duration,
     language: Option<&str>,
+    print_chunks: bool,
 ) -> MergeResult {
     let Ok(lang_profile) = LangProfile::find_by_filename_or_name(fname_base, language) else {
         return line_based_merge(contents_base, contents_left, contents_right, &settings);
@@ -48,6 +49,7 @@ pub fn line_merge_and_structured_resolution(
         full_merge,
         debug_dir,
         timeout,
+        print_chunks,
     );
 
     match select_best_merge(merges) {
@@ -91,6 +93,7 @@ pub fn cascading_merge(
     full_merge: bool,
     debug_dir: Option<&'static Path>,
     timeout: Duration,
+    print_chunks: bool,
 ) -> Vec<MergeResult> {
     // first attempt: try to merge as line-based
     let start = Instant::now();
@@ -113,7 +116,7 @@ pub fn cascading_merge(
 
         // second attempt: to solve the conflicts from the line-based merge
         if !line_based_merge.has_additional_issues {
-            let solved_merge = resolve_merge(&parsed_conflicts, &settings, lang_profile, debug_dir);
+            let solved_merge = resolve_merge(&parsed_conflicts, &settings, lang_profile, debug_dir, print_chunks);
 
             match solved_merge {
                 Ok(recovered_merge) => {
@@ -140,6 +143,7 @@ pub fn cascading_merge(
                 &settings,
                 lang_profile,
                 debug_dir,
+                print_chunks,
             );
             match structured_merge {
                 Ok(successful_merge) => merges.push(successful_merge),

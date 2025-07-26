@@ -15,7 +15,7 @@ use itertools::Itertools;
 use nu_ansi_term::Color;
 use rustc_hash::FxHashMap;
 use tree_sitter::{
-    Parser, Query, QueryCursor, Range as TSRange, StreamingIterator, Tree, TreeCursor,
+    Parser, Point, Query, QueryCursor, Range as TSRange, StreamingIterator, Tree, TreeCursor,
 };
 use typed_arena::Arena;
 
@@ -48,6 +48,9 @@ pub struct AstNode<'a> {
     pub field_name: Option<&'static str>,
     /// The range of bytes in the original source code that the source of this node spans
     pub byte_range: Range<usize>,
+    //start and end points
+    pub start_point: Point,
+    pub end_point: Point,
     /// An internal node id, guaranteed to be unique within the tree.
     pub id: usize,
     /// A cached number of descendants
@@ -326,6 +329,8 @@ impl<'a> AstNode<'a> {
                     grammar_name: "@virtual_line@",
                     field_name: None,
                     byte_range: start_position..start_position + trimmed.len(),
+                    start_point: Point::default(),
+                    end_point: Point::default(),
                     id: *next_node_id,
                     descendant_count: 1,
                     parent: UnsafeCell::new(None),
@@ -375,6 +380,8 @@ impl<'a> AstNode<'a> {
             field_name,
             // parse-specific fields not included in hash/isomorphism
             byte_range: range,
+            start_point: node.start_position(),
+            end_point: node.end_position(),
             id: *next_node_id,
             descendant_count,
             parent: UnsafeCell::new(None),
@@ -411,7 +418,7 @@ impl<'a> AstNode<'a> {
                 process_node(child, result, i);
             }
             let end = *i;
-            unsafe { *node.dfs.get() = Some(&result[start..end]) };
+            unsafe { (*node.dfs.get()) = Some(&result[start..end]) };
         }
 
         let mut i = 0;
@@ -774,7 +781,7 @@ impl<'a> AstNode<'a> {
 
     /// The source of this node, stripped from any indentation inherited by the node or its ancestors
     pub fn unindented_source(&'a self) -> Cow<'a, str> {
-        match (self.preceding_indentation()).or_else(|| self.ancestor_indentation()) {
+        match self.preceding_indentation().or(self.ancestor_indentation()) {
             Some(indentation) => {
                 // TODO FIXME this is invalid for multiline string literals!
                 Cow::from(self.source.replace(&format!("\n{indentation}"), "\n"))
@@ -787,7 +794,7 @@ impl<'a> AstNode<'a> {
     /// and shifted back to the desired indentation.
     pub fn reindented_source(&'a self, new_indentation: &str) -> Cow<'a, str> {
         let indentation = (self.preceding_indentation())
-            .or_else(|| self.ancestor_indentation())
+            .or(self.ancestor_indentation())
             .unwrap_or("");
         if indentation == new_indentation {
             return Cow::from(self.source);
@@ -833,40 +840,35 @@ impl<'a> AstNode<'a> {
 
         let tree_sym = if last_child { "└" } else { "├" };
 
-        let escape_whitespace = |string: &str| string.replace('\n', "\\n").replace('\t', "\\t");
+        let key = (self.field_name)
+            .map(|key| format!("{key}: "))
+            .unwrap_or_default();
 
-        let key = if let Some(key) = self.field_name {
-            format!("{key}: ")
-        } else {
-            String::new()
-        };
-
-        let escaped_grammar_name = escape_whitespace(self.grammar_name);
         let grammar_name = if self.source != self.grammar_name {
-            escaped_grammar_name
+            self.grammar_name
         } else {
-            Color::Red.paint(escaped_grammar_name).to_string()
+            &Color::Red.paint(self.grammar_name).to_string()
         };
 
         let source = if num_children == 0 && self.source != self.grammar_name {
-            format!(" {}", Color::Red.paint(escape_whitespace(self.source)))
+            format!(" {}", Color::Red.paint(self.source.replace('\n', "\\n")))
         } else {
-            String::new()
+            Default::default()
         };
 
         let commutative = if next_parent.is_some() {
             Color::LightPurple.paint(" Commutative").to_string()
         } else {
-            String::new()
+            Default::default()
         };
 
-        let sig = if parent.is_some()
-            && let Some(sig) = self.signature()
-        {
-            format!(" {}", Color::LightCyan.paint(sig.to_string()))
-        } else {
-            String::new()
-        };
+        let sig = (parent.is_some())
+            .then(|| {
+                self.signature()
+                    .map(|sig| format!(" {}", Color::LightCyan.paint(sig.to_string())))
+            })
+            .flatten()
+            .unwrap_or_default();
 
         std::iter::once(format!(
             "{prefix}{tree_sym}{key}\x1b[0m{grammar_name}{source}{commutative}{sig}\n"
@@ -923,6 +925,8 @@ impl Hash for AstNode<'_> {
         self.id.hash(state);
         self.grammar_name.hash(state);
         self.byte_range.hash(state);
+        self.start_point.hash(state);
+        self.end_point.hash(state);
     }
 }
 
@@ -933,6 +937,8 @@ impl PartialEq for AstNode<'_> {
             && self.grammar_name == other.grammar_name
             && self.lang_profile == other.lang_profile
             && self.byte_range == other.byte_range
+            && self.start_point == other.start_point
+            && self.end_point == other.end_point
     }
 }
 

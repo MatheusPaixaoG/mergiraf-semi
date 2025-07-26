@@ -29,6 +29,7 @@ pub fn structured_merge(
     settings: &DisplaySettings,
     lang_profile: &LangProfile,
     debug_dir: Option<&Path>,
+    print_chunks: bool,
 ) -> Result<MergeResult, String> {
     let arena = Arena::new();
     let ref_arena = Arena::new();
@@ -85,6 +86,7 @@ pub fn structured_merge(
         &auxiliary_matcher,
         settings,
         debug_dir,
+        print_chunks,
     );
     debug!("{result_tree}");
 

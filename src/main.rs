@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    env, fs, io,
+    env, fs,
     path::{Path, PathBuf},
     process::{Command, exit},
     time::Duration,
@@ -54,6 +54,9 @@ struct MergeOrSolveArgs {
     /// Override automatic language detection.
     #[arg(short = 'L', long)]
     language: Option<String>,
+    /// Print a detailed, chunk-by-chunk log of the merge process
+    #[arg(long, default_value_t = false)]
+    print_chunks: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -105,8 +108,7 @@ enum CliCommand {
         #[command(flatten)]
         merge_or_solve: MergeOrSolveArgs,
         /// Keep file untouched and show the results of resolution on standard output instead
-        // TODO(0.13.0): remove the alias
-        #[arg(short = 'p', long, alias = "keep")]
+        #[arg(short = 'p', long)]
         stdout: bool,
         /// Create a copy of the original file by adding the `.orig` suffix to it
         #[arg(
@@ -116,9 +118,14 @@ enum CliCommand {
             num_args = 0..=1,
             require_equals = true,
             action = ArgAction::Set,
-            conflicts_with = "stdout",
+            conflicts_with_all = ["stdout", "keep"]
         )]
         keep_backup: bool,
+        /// DEPRECATED(use `--stdout`): Keep file untouched and show the results of resolution on standard output instead
+        // TODO(0.8.0): hide the option by turning it into a hidden alias of `stdout`
+        // TODO(?): remove the alias
+        #[arg(short, long, conflicts_with = "stdout")]
+        keep: bool,
     },
     /// Review the resolution of a merge by showing the differences with a line-based merge
     Review {
@@ -175,6 +182,7 @@ fn real_main(args: CliArgs) -> Result<i32, String> {
                     compact,
                     conflict_marker_size,
                     language,
+                    print_chunks,
                 },
             timeout,
         } => {
@@ -223,8 +231,7 @@ fn real_main(args: CliArgs) -> Result<i32, String> {
                 let mergiraf_disabled = env::var(DISABLING_ENV_VAR).as_deref() == Ok("0");
 
                 if mergiraf_disabled {
-                    return fallback_to_git_merge_file(base, left, right, git, &settings)
-                        .map_err(|e| format!("error when calling git-merge-file: {e}"));
+                    return fallback_to_git_merge_file(base, left, right, git, &settings);
                 }
             }
 
@@ -258,6 +265,7 @@ fn real_main(args: CliArgs) -> Result<i32, String> {
                 debug_dir,
                 Duration::from_millis(timeout.unwrap_or(if fast { 5000 } else { 10000 })),
                 language.as_deref(),
+                print_chunks,
             );
             if let Some(fname_out) = output {
                 write_string_to_file(&fname_out, &merge_result.contents)?;
@@ -289,11 +297,27 @@ fn real_main(args: CliArgs) -> Result<i32, String> {
                     compact,
                     conflict_marker_size,
                     language,
+                    print_chunks,
                 },
-            stdout,
+            keep,
+            mut stdout,
             keep_backup,
         } => {
-            if conflict_location_looks_like_jj_repo(&fname_conflicts) {
+            if keep {
+                warn!("-k/--keep is DEPRECATED, use -p/--stdout instead");
+                // since we only use `stdout` in the actual logic below,
+                // update its value with what of `--keep`
+                stdout = keep;
+            }
+            // Check if user is using Jujutsu instead of Git, which can lead to issues.
+            if let Ok(canonical_path) = fname_conflicts.canonicalize()
+                && let Some(conflict_dir) = canonical_path.parent()
+                && Command::new("jj")
+                    .arg("root")
+                    .current_dir(conflict_dir)
+                    .output()
+                    .is_ok_and(|o| o.status.success())
+            {
                 return Err(
                     "\
                     You seem to be using Jujutsu instead of Git.\n\
@@ -327,6 +351,7 @@ fn real_main(args: CliArgs) -> Result<i32, String> {
                 debug_dir.as_deref(),
                 &working_dir,
                 language.as_deref(),
+                print_chunks,
             );
             match postprocessed {
                 Ok(merged) => {
@@ -385,66 +410,39 @@ fn fallback_to_git_merge_file(
     right: &Path,
     git: bool,
     settings: &DisplaySettings,
-) -> io::Result<i32> {
+) -> Result<i32, String> {
     let mut command = Command::new("git");
     command.arg("merge-file").arg("--diff-algorithm=histogram");
     if !git {
         command.arg("-p");
     }
-    if let Some(left_rev_name) = settings.left_revision_name.as_deref() {
-        command.args(["-L", left_rev_name]);
+    if let (Some(base_rev_name), Some(left_rev_name), Some(right_rev_name)) = (
+        settings.base_revision_name.as_deref(),
+        settings.left_revision_name.as_deref(),
+        settings.right_revision_name.as_deref(),
+    ) {
+        command
+            .arg("-L")
+            .arg(left_rev_name)
+            .arg("-L")
+            .arg(base_rev_name)
+            .arg("-L")
+            .arg(right_rev_name);
+    };
 
-        if let Some(base_rev_name) = settings.base_revision_name.as_deref() {
-            command.args(["-L", base_rev_name]);
-
-            if let Some(right_rev_name) = settings.right_revision_name.as_deref() {
-                command.args(["-L", right_rev_name]);
-            }
-        }
-    }
-
-    let exit_code = command
+    command
         .arg("--marker-size")
         .arg(settings.conflict_marker_size_or_default().to_string())
-        .args([left, base, right])
-        .spawn()?
-        .wait()?
-        .code()
-        .unwrap_or(0);
-
-    Ok(exit_code)
-}
-
-/// Check if user is using Jujutsu instead of Git, which can lead to issues when running
-/// `mergiraf solve`
-fn conflict_location_looks_like_jj_repo(fname_conflicts: &Path) -> bool {
-    if let Ok(conflict_path) = fname_conflicts.canonicalize()
-        && let Some(conflict_dir) = conflict_path.parent()
-        && let Ok(output) = Command::new("jj")
-            .arg("root")
-            .current_dir(conflict_dir)
-            .output()
-        && output.status.success()
-        // output of `jj root` contains a trailing newline
-        && let stdout = output.stdout.trim_ascii_end()
-        && let Ok(repo_path) = str::from_utf8(stdout)
-        // There's a JSON stream editor also called `jj`, which, when called with `jj root`,
-        // actually returns an empty stdout (even though when running interactively, it seems to
-        // just hang). And out latter check for `fs::exists` actually doesn't recognize that,
-        // because "empty path" + "/.jj" gives a relative path ".jj", which just happens to be
-        // valid (if the repos are colocated). So we sanity-check that the output is not empty.
-        //
-        // One could imagine a program that returns _something_ on `jj root`, even an
-        // "unknown subcommand: root", but the hope is that the path created by joining "/.jj" onto
-        // that will end up being invalid, which `fs::exists` will catch
-        && !repo_path.is_empty()
-        && let jj_root = Path::new(repo_path).join(".jj")
-        && let Ok(true) = fs::exists(jj_root)
-    {
-        true
-    } else {
-        false
-    }
+        .arg(left)
+        .arg(base)
+        .arg(right)
+        .spawn()
+        .and_then(|mut process| {
+            process
+                .wait()
+                .map(|exit_status| exit_status.code().unwrap_or(0))
+        })
+        .map_err(|err| err.to_string())
 }
 
 #[cfg(test)]

@@ -39,6 +39,7 @@ pub fn three_way_merge<'a>(
     auxiliary_matcher: &TreeMatcher,
     settings: &DisplaySettings<'a>,
     debug_dir: Option<&Path>,
+    print_chunks: bool,
 ) -> (MergedTree<'a>, ClassMapping<'a>) {
     // match all pairs of revisions
     let (base_left_matching, base_right_matching, left_right_matching) = generate_matchings(
@@ -74,6 +75,7 @@ pub fn three_way_merge<'a>(
         &base_changeset,
         &cleaned_changeset,
         settings,
+        print_chunks,
     );
 
     // post-process to highlight signature conflicts
@@ -287,9 +289,10 @@ fn build_tree<'a>(
     base_changeset: &ChangeSet<'a>,
     cleaned_changeset: &ChangeSet<'a>,
     settings: &DisplaySettings<'a>,
+    print_chunks: bool,
 ) -> MergedTree<'a> {
     let start: Instant = Instant::now();
-    let tree_builder = TreeBuilder::new(cleaned_changeset, base_changeset, class_mapping, settings);
+    let tree_builder = TreeBuilder::new(cleaned_changeset, base_changeset, class_mapping, settings, print_chunks);
     let merged_tree = tree_builder.build_tree().unwrap_or_else(|_| {
         let line_based = line_based_merge_parsed(base.source, left.source, right.source, settings);
         MergedTree::LineBasedMerge {
