@@ -61,6 +61,10 @@ pub fn three_way_merge<'a>(
         &left_right_matching,
     );
 
+    class_mapping.populate_from_ast(Revision::Base, base);
+    class_mapping.populate_from_ast(Revision::Left, left);
+    class_mapping.populate_from_ast(Revision::Right, right);
+
     class_mapping.unify_concurrent_additions();
 
     // convert all the trees to PCS triples
@@ -246,6 +250,15 @@ fn generate_pcs_triples<'a>(
         base_changeset.save(debug_dir.join("base_changeset.txt"));
     }
     debug!("generating PCS triples took {:?}", start.elapsed());
+
+    {
+        debug!("[PCS] Triples before cleanup:");
+        let successors: Vec<_> = changeset.iter_successors().collect();
+        for (node, pcs) in successors {
+            debug!("Successor {} -> {}", node.short_debug(), pcs.short_debug());
+        }        
+    }
+
 
     (changeset, base_changeset)
 }

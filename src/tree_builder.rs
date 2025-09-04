@@ -509,7 +509,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                             &right,
                             commutative_parent,
                             visiting_state,
-                            log_state
+                            log_state,
                         )?;
 
                         if let Some(ls) = log_state.as_mut(){
@@ -833,6 +833,8 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                     && trimmed != trimmed_right_delim
             })
             .map(move |n| self.class_mapping.map_to_leader(RevNode::new(revision, n)))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
     }
 
     /// Collects examples of separators with the surrounding whitespace
@@ -877,7 +879,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         // TODO improve handling of comments? comments added by the right side should ideally be placed sensibly
 
         // first, map each list via class mapping to make each element comparable
-        let base_leaders: HashSet<_> = self
+        let base_seq: Vec<_> = self
             .keep_content_only(
                 base,
                 Revision::Base,
@@ -886,7 +888,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 trimmed_right_delim,
             )
             .collect();
-        let left_leaders: HashSet<_> = self
+        let left_seq: Vec<_> = self
             .keep_content_only(
                 left,
                 Revision::Left,
@@ -895,7 +897,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 trimmed_right_delim,
             )
             .collect();
-        let right_leaders: HashSet<_> = self
+        let right_seq: Vec<_> = self
             .keep_content_only(
                 right,
                 Revision::Right,
@@ -904,6 +906,14 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 trimmed_right_delim,
             )
             .collect();
+
+        let base_leaders: HashSet<_> = base_seq.iter().copied().collect();
+        let left_leaders: HashSet<_> = left_seq.iter().copied().collect();
+        let right_leaders: HashSet<_> = right_seq.iter().copied().collect();
+
+        debug!("{pad}base_leaders: {}", base_leaders.iter().format(", "));
+        debug!("{pad}left_leaders: {}", left_leaders.iter().format(", "));
+        debug!("{pad}right_leaders: {}", right_leaders.iter().format(", "));            
 
         // check that all the nodes involved are allowed to commute in this context
         let child_types: HashSet<&str> = (base_leaders.iter())
@@ -956,14 +966,41 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
             .copied()
             .collect();
 
-        let merged: Vec<_> = left_leaders
-        .iter()
-        .filter(|n| !right_removed_and_not_modified.contains(n))
-        .copied()
-        .chain(right_added)
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
+        let merged_set: HashSet<_> = left_leaders
+            .iter()
+            .filter(|n| !right_removed_and_not_modified.contains(n))
+            .copied()
+            .chain(right_leaders.difference(&base_leaders).copied())
+            .collect();
+
+        let merged: Vec<_> = if self.semistructured_strategy.is_some() {
+
+            let to_pos_map = |seq: &Vec<Leader<'a>>| -> HashMap<Leader<'a>, usize> {
+                let mut m = HashMap::with_capacity(seq.len());
+                for (i, l) in seq.iter().enumerate() {
+                    m.entry(*l).or_insert(i);
+                }
+                m
+            };
+
+            let pos_r = to_pos_map(&right_seq);
+            let pos_l = to_pos_map(&left_seq);
+            let pos_b = to_pos_map(&base_seq);
+
+            let mut v: Vec<_> = merged_set.iter().copied().collect();
+
+            v.sort_by_key(|l| {(
+                pos_r.get(l).copied().unwrap_or(usize::MAX),
+                pos_l.get(l).copied().unwrap_or(usize::MAX),
+                pos_b.get(l).copied().unwrap_or(usize::MAX),
+            )});
+
+            v
+        } else {
+            merged_set.into_iter().collect()
+        };
+
+        debug!("{pad}merged leaders: {}", merged.iter().format(", "));
 
         // build the result tree for each element of the result
         let merged_content: Vec<MergedTree<'a>> = merged
@@ -1065,6 +1102,11 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 self.class_mapping.revision_set(&right_delim),
                 self.class_mapping,
             ));
+        }
+
+        debug!("{pad}with_separators (final merged children):");
+        for child in &with_separators {
+            debug!("{pad}   {}", child.short_debug());
         }
 
         Ok(with_separators)

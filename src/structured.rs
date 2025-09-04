@@ -98,33 +98,36 @@ pub fn structured_merge(
 
     let merged_text = result_tree.to_merged_text(&class_mapping);
 
-    // Check that the rendered merge is faithful to the tree
-    let revisions_to_check = if merged_text.count_conflicts() == 0 {
-        [Revision::Base].as_slice()
-    } else {
-        [Revision::Base, Revision::Left, Revision::Right].as_slice()
-    };
-    for revision in revisions_to_check {
-        let merged_revision = merged_text.reconstruct_revision(*revision);
-        let arena = Arena::new();
-        let ref_arena = Arena::new();
-        let tree = AstNode::parse(
-            &merged_revision,
-            lang_profile,
-            &arena,
-            &ref_arena,
-            false, //merge tree should never be truncated due to isomorphism checks
-        )
-        .map_err(|err| {
-            format!(
-                "merge discarded because rendered revision {revision} has a parsing error: {err}"
+    if semistructured.is_none() {
+        // Check that the rendered merge is faithful to the tree
+        let revisions_to_check = if merged_text.count_conflicts() == 0 {
+            [Revision::Base].as_slice()
+        } else {
+            [Revision::Base, Revision::Left, Revision::Right].as_slice()
+        };
+
+        for revision in revisions_to_check {
+            let merged_revision = merged_text.reconstruct_revision(*revision);
+            let arena = Arena::new();
+            let ref_arena = Arena::new();
+            let tree = AstNode::parse(
+                &merged_revision,
+                lang_profile,
+                &arena,
+                &ref_arena,
+                false, //merge tree should never be truncated due to isomorphism checks
             )
-        })?;
-        if !result_tree.isomorphic_to_source(tree, *revision, &class_mapping) {
-            debug!(
-                "discarding merge because rendered revision {revision} isn't isomorphic to the merged tree"
-            );
-            return Err("merge discarded after isomorphism check".to_owned());
+            .map_err(|err| {
+                format!(
+                    "merge discarded because rendered revision {revision} has a parsing error: {err}"
+                )
+            })?;
+            if !result_tree.isomorphic_to_source(tree, *revision, &class_mapping) {
+                debug!(
+                    "discarding merge because rendered revision {revision} isn't isomorphic to the merged tree"
+                );
+                return Err("merge discarded after isomorphism check".to_owned());
+            }
         }
     }
 

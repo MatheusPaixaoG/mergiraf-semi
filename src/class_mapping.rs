@@ -73,6 +73,10 @@ impl<'a> Leader<'a> {
     pub fn signature_definition(&self) -> Option<&SignatureDefinition> {
         self.0.node.signature_definition()
     }
+
+    pub fn rev_node(&self) -> &RevNode<'a> {
+        &self.0
+    }
 }
 
 impl Display for RevNode<'_> {
@@ -155,6 +159,13 @@ impl<'a> ClassMapping<'a> {
                     *exacts += 1;
                 }
             }
+        }
+    }
+
+    pub fn populate_from_ast(&mut self, rev: Revision, root: &'a AstNode<'a>) {
+        for node in root.dfs() {
+            let rev_node = RevNode::new(rev, node);
+            self.map.entry(rev_node).or_insert(Leader(rev_node));
         }
     }
 
@@ -296,28 +307,39 @@ impl<'a> ClassMapping<'a> {
         // Cria um mapa de assinatura para nós para uma busca eficiente.
         let mut right_sig_map: FxHashMap<Signature, Vec<RevNode>> = FxHashMap::default();
         for rev_node in unmatched_right {
-            if let Some(signature) = rev_node.node.signature() {
-                right_sig_map.entry(signature).or_default().push(rev_node);
+            match rev_node.node.signature(){
+                Some(signature) => {
+                    debug!("[CM DEBUG] Right node {} has signature {}", rev_node, signature);
+                    right_sig_map.entry(signature).or_default().push(rev_node);
+                }
+                None => {
+                    debug!("[CM DEBUG] Right node {} has NO signature", rev_node);
+                }
             }
         }
 
         debug!("[CM DEBUG] Right Signature Map: {:?}", right_sig_map.keys());
 
         for left_node in unmatched_left {
-            if let Some(signature) = left_node.node.signature() {
-
-                debug!("[CM DEBUG] Processing Left Node with Signature: {}", signature);
-
-                if let Some(right_nodes) = right_sig_map.get_mut(&signature) {
-
-                    debug!("[CM DEBUG] Match Found in Right!.");
-
-                    if let Some(right_node) = right_nodes.pop() {
-
-                        debug!("[CM DEBUG] Unifying {} and {}", left_node, right_node);
-
-                        self.unify_nodes(left_node, right_node);
+            match left_node.node.signature() {
+                Some(signature) => {
+                    
+                    debug!("[CM DEBUG] Processing Left Node with Signature: {}", signature);
+        
+                    if let Some(right_nodes) = right_sig_map.get_mut(&signature) {
+        
+                        debug!("[CM DEBUG] Match Found in Right!");
+        
+                        if let Some(right_node) = right_nodes.pop() {
+        
+                            debug!("[CM DEBUG] Unifying {} and {}", left_node, right_node);
+        
+                            self.unify_nodes(left_node, right_node);
+                        }
                     }
+                }
+                None => {
+                    debug!("[CM DEBUG] Left node {} has NO signature", left_node);
                 }
             }
         }
@@ -326,7 +348,13 @@ impl<'a> ClassMapping<'a> {
 
     fn get_unmatched_nodes(&self, rev: Revision, other_rev: Revision) -> impl Iterator<Item = RevNode<'a>> + '_ {
         self.iter_rev(rev).filter(move |&rev_node| {
-            self.get_equivalent_node(rev_node, other_rev).is_none()
+            let equiv = self.get_equivalent_node(rev_node, other_rev);
+            if equiv.is_none() {
+                debug!("[CM DEBUG] {:?} node {} has NO equivalent in {:?}", rev, rev_node, other_rev);
+            } else {
+                debug!("[CM DEBUG] {:?} node {} matched with {:?}", rev, rev_node, other_rev);
+            }
+            equiv.is_none()
         })
     }
 

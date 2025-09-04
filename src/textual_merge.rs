@@ -19,8 +19,8 @@ impl TextualMerger for DiffyMerger {
         let result = diffy::merge(base, left, right);
 
         match result {
-            Ok(merged_text) => TextualMergeResult::Conflict(merged_text),
-            Err(conflict_text) => TextualMergeResult::Success(conflict_text),
+            Ok(merged_text) => TextualMergeResult::Success(merged_text),
+            Err(conflict_text) => TextualMergeResult::Conflict(conflict_text),
         }
     }
 }

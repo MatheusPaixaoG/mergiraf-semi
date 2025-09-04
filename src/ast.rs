@@ -15,7 +15,7 @@ use itertools::Itertools;
 use nu_ansi_term::Color;
 use rustc_hash::FxHashMap;
 use tree_sitter::{
-    Parser, Point, Query, QueryCursor, Range as TSRange, StreamingIterator, Tree, TreeCursor,
+    Node, Parser, Point, Query, QueryCursor, Range as TSRange, StreamingIterator, Tree, TreeCursor,
 };
 use typed_arena::Arena;
 
@@ -946,6 +946,20 @@ impl<'a> AstNode<'a> {
         conflict_in_self() || conflict_in_children()
     }
 
+    fn find_first_descendant_with_kind<'b>(root: Node<'b>, kind: &'static str) -> Option<Node<'b>> {
+        let mut stack = vec![root];
+        while let Some(n) = stack.pop(){
+            if n.grammar_name() == kind {
+                return Some(n);
+            }
+            let mut c = n.walk();
+            for child in n.children(&mut c) {
+                stack.push(child);
+            }
+        }
+        None
+    }
+
     /// Extracts a signature for this node if we have a signature definition
     /// for this type of nodes in the language profile.
     pub(crate) fn signature(&'a self) -> Option<Signature<'a, 'a>> {
@@ -957,7 +971,15 @@ impl<'a> AstNode<'a> {
                 return None;
             }
             if let Some(tree) = parser.parse(self.source, None) {
-                let temp_sig = definition.extract_signature_from_ts_node(&tree.root_node(), self.source);
+                let root = tree.root_node();
+                let target = if root.grammar_name() == self.grammar_name {
+                    root
+                } else {
+                    Self::find_first_descendant_with_kind(root, self.grammar_name)
+                        .unwrap_or(root) //non ideal but avoids receiving None
+                };
+
+                let temp_sig = definition.extract_signature_from_ts_node(&target, self.source);
                 
                 debug!("[AST DEBUG] Extracted Signature: {}", temp_sig);
 
