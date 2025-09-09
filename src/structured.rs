@@ -33,6 +33,8 @@ pub fn structured_merge(
     print_chunks: bool,
     semistructured: Option<TextualMergeStrategy>,
 ) -> Result<MergeResult, String> {
+    debug!("[STRUCTURED DEBUG] structured_merge called with semistructured = {:?}", semistructured);
+
     let arena = Arena::new();
     let ref_arena = Arena::new();
 

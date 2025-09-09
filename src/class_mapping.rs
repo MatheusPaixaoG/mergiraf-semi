@@ -318,7 +318,7 @@ impl<'a> ClassMapping<'a> {
             }
         }
 
-        debug!("[CM DEBUG] Right Signature Map: {:?}", right_sig_map.keys());
+        //debug!("[CM DEBUG] Right Signature Map: {:?}", right_sig_map.keys());
 
         for left_node in unmatched_left {
             match left_node.node.signature() {

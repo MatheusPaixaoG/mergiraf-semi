@@ -39,6 +39,12 @@ impl<'a> ChunkData<'a> {
     pub fn is_empty(&self) -> bool {
         self.left_nodes.is_empty() && self.base_nodes.is_empty() && self.right_nodes.is_empty()
     }
+
+    pub fn clear(&mut self) {
+        self.base_nodes.clear();
+        self.left_nodes.clear();
+        self.right_nodes.clear();
+    }
 }
 
 // Estado para manter o log durante a recursão
@@ -937,6 +943,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         // check which right removed elements have been modified on the left-hand side,
         // in which case they should be kept
         let mut removed_visiting_state = visiting_state.clone();
+        let mut temp_log_for_removed: Option<LogState<'a>> = None;
         let right_removed_content: Vec<_> = right_removed
             .into_iter()
             .map(|revnode| {
@@ -946,7 +953,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                         node: revnode,
                     },
                     &mut removed_visiting_state,
-                    log_state,
+                    &mut temp_log_for_removed,
                 )?;
                 Ok((revnode, subtree))
             })
@@ -1003,19 +1010,19 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         debug!("{pad}merged leaders: {}", merged.iter().format(", "));
 
         // build the result tree for each element of the result
-        let merged_content: Vec<MergedTree<'a>> = merged
-            .into_iter()
-            .map(|revnode| {
-                self.build_subtree(
-                    PCSNode::Node {
-                        revisions: self.class_mapping.revision_set(&revnode),
-                        node: revnode,
-                    },
-                    visiting_state,
-                    log_state,
-                )
-            })
-            .collect::<Result<_, _>>()?;
+        let mut merged_pairs: Vec<(Leader<'a>, MergedTree<'a>)> = Vec::with_capacity(merged.len());
+        let mut temp_log_for_pairs: Option<LogState<'a>> = None;
+        for revnode in merged.iter().copied() {
+            let tree = self.build_subtree(
+                PCSNode::Node {
+                    revisions: self.class_mapping.revision_set(&revnode),
+                    node: revnode,
+                },
+                visiting_state,
+                &mut temp_log_for_pairs,
+            )?;
+            merged_pairs.push((revnode, tree));
+        }
 
         // try to find examples of delimiters and separator in the existing revisions
         let left_delim = [
@@ -1078,25 +1085,130 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         // add delimiters and separators in the merged list
         let mut with_separators = Vec::new();
         if let Some(left_delim) = left_delim {
+
+            if let Some(ls) = log_state.as_mut() {
+                let revs = self.class_mapping.revision_set(&left_delim);
+                if revs.contains(Revision::Left) {
+                    if let Some(n) = self.class_mapping.node_at_rev(&left_delim, Revision::Left) {
+                        ls.current_stable.left_nodes.push(n);
+                    }
+                }
+                if revs.contains(Revision::Base) {
+                    if let Some(n) = self.class_mapping.node_at_rev(&left_delim, Revision::Base) {
+                        ls.current_stable.base_nodes.push(n);
+                    }
+                }
+                if revs.contains(Revision::Right) {
+                    if let Some(n) = self.class_mapping.node_at_rev(&left_delim, Revision::Right) {
+                        ls.current_stable.right_nodes.push(n);
+                    }
+                }
+            }
+
+
             with_separators.push(MergedTree::new_exact(
                 left_delim,
                 self.class_mapping.revision_set(&left_delim),
                 self.class_mapping,
             ));
         }
+
         let mut first = !starts_with_separator;
-        for merged in merged_content {
+
+        for (revnode, merged_tree) in merged_pairs {
             if first {
                 first = false;
             } else {
                 with_separators.push(separator.clone());
             }
-            with_separators.push(merged);
+
+            //updated logging for semistructured
+            if let Some(ls) = log_state.as_mut() {
+                let push_leader_into_current_stable = |ls: &mut LogState<'a>, leader: Leader<'a>, class_mapping: &ClassMapping<'a>| {
+                    let revs = class_mapping.revision_set(&leader);
+                    if revs.contains(Revision::Left) {
+                        if let Some(n) = class_mapping.node_at_rev(&leader, Revision::Left) {
+                            ls.current_stable.left_nodes.push(n);
+                        }
+                    }
+                    if revs.contains(Revision::Base) {
+                        if let Some(n) = class_mapping.node_at_rev(&leader, Revision::Base) {
+                            ls.current_stable.base_nodes.push(n);
+                        }
+                    }
+                    if revs.contains(Revision::Right) {
+                        if let Some(n) = class_mapping.node_at_rev(&leader, Revision::Right) {
+                            ls.current_stable.right_nodes.push(n);
+                        }
+                    }
+                };
+
+                match &merged_tree {
+                    MergedTree::TextuallyMerged { node: leader, has_conflict: true, .. } => {
+                        debug!("[TB DEBUG] Entering TextuallyMerged Log");
+                        if !ls.current_stable.is_empty() {
+                            ls.log.push(MergeChunk::Stable(std::mem::take(&mut ls.current_stable)));
+                        }
+
+                        let mut conflict_chunk_data = ChunkData::default();
+                        let revs = self.class_mapping.revision_set(leader);
+
+                        if revs.contains(Revision::Left) {
+                            if let Some(n) = self.class_mapping.node_at_rev(leader, Revision::Left) {
+                                conflict_chunk_data.left_nodes.push(n);
+                            }
+                        }
+                        if revs.contains(Revision::Base) {
+                            if let Some(n) = self.class_mapping.node_at_rev(leader, Revision::Base) {
+                                conflict_chunk_data.base_nodes.push(n);
+                            }
+                        }
+                        if revs.contains(Revision::Right) {
+                            if let Some(n) = self.class_mapping.node_at_rev(leader, Revision::Right) {
+                                conflict_chunk_data.right_nodes.push(n);
+                            }
+                        }
+                        ls.log.push(MergeChunk::Unstable(conflict_chunk_data));
+                    }
+                    
+                    MergedTree::ExactTree { node, .. }
+                    | MergedTree::MixedTree { node, .. }
+                    | MergedTree::LineBasedMerge { node, .. }
+                    | MergedTree::TextuallyMerged { node, has_conflict: false, .. } => {
+                        push_leader_into_current_stable(ls, *node, self.class_mapping);
+                    }
+
+                    MergedTree::CommutativeChildSeparator { .. } | MergedTree::Conflict { .. } => {}
+                }
+            }
+
+            with_separators.push(merged_tree);
         }
+
         if ends_with_separator {
             with_separators.push(separator);
         }
+
         if let Some(right_delim) = right_delim {
+            if let Some(ls) = log_state.as_mut() {
+                let revs = self.class_mapping.revision_set(&right_delim);
+                if revs.contains(Revision::Left) {
+                    if let Some(n) = self.class_mapping.node_at_rev(&right_delim, Revision::Left) {
+                        ls.current_stable.left_nodes.push(n);
+                    }
+                }
+                if revs.contains(Revision::Base) {
+                    if let Some(n) = self.class_mapping.node_at_rev(&right_delim, Revision::Base) {
+                        ls.current_stable.base_nodes.push(n);
+                    }
+                }
+                if revs.contains(Revision::Right) {
+                    if let Some(n) = self.class_mapping.node_at_rev(&right_delim, Revision::Right) {
+                        ls.current_stable.right_nodes.push(n);
+                    }
+                }
+            }
+    
             with_separators.push(MergedTree::new_exact(
                 right_delim,
                 self.class_mapping.revision_set(&right_delim),

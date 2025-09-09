@@ -179,6 +179,7 @@ pub static SUPPORTED_LANGUAGES: LazyLock<Vec<LangProfile>> = LazyLock::new(|| {
             ],
             injections: None,
             truncation_node_kinds: [
+                "field_declaration",
                 "method_declaration",
                 "constructor_declaration",
                 "import_declaration",

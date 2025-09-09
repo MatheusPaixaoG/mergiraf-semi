@@ -65,7 +65,9 @@ pub fn three_way_merge<'a>(
     class_mapping.populate_from_ast(Revision::Left, left);
     class_mapping.populate_from_ast(Revision::Right, right);
 
-    class_mapping.unify_concurrent_additions();
+    if semistructured.is_some(){
+        class_mapping.unify_concurrent_additions();
+    }
 
     // convert all the trees to PCS triples
     let (changeset, base_changeset) =
