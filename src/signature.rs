@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::iter::zip;
 
+use log::debug;
 use itertools::Itertools;
 use tree_sitter::Node;
 
@@ -359,6 +360,20 @@ impl SignatureDefinition {
                     match step {
                         PathStep::Field(field_name) => {
                             let mut cursor = current_node.walk();
+
+                            for i in 0..current_node.child_count() {
+                                if let Some(child) = current_node.child(i) {
+                                    let field_name = current_node.field_name_for_child(i as u32);
+                                    debug!(
+                                        "[SIGNATURE DEBUG] parent_kind={} -> child_kind={} field_name={:?} text={:?}",
+                                        current_node.grammar_name(),
+                                        child.grammar_name(),
+                                        field_name,
+                                        child.utf8_text(source.as_bytes()).unwrap_or("<invalid>")
+                                    );                                    
+                                }
+                            }                            
+
                             for child in current_node.children_by_field_name(field_name, &mut cursor) {
                                 next_nodes.push(child);
                             }

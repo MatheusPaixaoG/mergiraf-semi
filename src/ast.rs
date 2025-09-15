@@ -966,26 +966,35 @@ impl<'a> AstNode<'a> {
         let definition = self.signature_definition()?;
 
         if self.children.is_empty() && self.lang_profile.truncation_node_kinds.contains(self.grammar_name) {
+            let global_source = self.root().source;
             let mut parser = Parser::new();
+
             if parser.set_language(&self.lang_profile.language).is_err() {
+                debug!("[AST DEBUG] Failed to set language for re-parsing.");
                 return None;
             }
-            if let Some(tree) = parser.parse(self.source, None) {
+
+            if let Some(tree) = parser.parse(global_source, None) {
                 let root = tree.root_node();
-                let target = if root.grammar_name() == self.grammar_name {
-                    root
-                } else {
-                    Self::find_first_descendant_with_kind(root, self.grammar_name)
-                        .unwrap_or(root) //non ideal but avoids receiving None
+
+                let Some(target) = root.descendant_for_byte_range(self.byte_range.start, self.byte_range.end) else {
+                    debug!("[AST DEBUG] Could not find a descendant for the given byte range.");
+                    return None;
                 };
 
-                let temp_sig = definition.extract_signature_from_ts_node(&target, self.source);
+                if target.start_byte() != self.byte_range.start || target.end_byte() != self.byte_range.end {
+                    debug!("[AST DEBUG] Found node does not match the exact byte range.");
+                    return None;
+                }
+
+                let temp_sig = definition.extract_signature_from_ts_node(&target, global_source);
                 
-                debug!("[AST DEBUG] Extracted Signature: {}", temp_sig);
+                debug!("[AST DEBUG] Extracted Signature (with descendant_for_byte_range): {}", temp_sig);
 
                 let static_sig = temp_sig.to_static();
                 return Some(unsafe { std::mem::transmute(static_sig) });
             }
+          
             return None;
         }
 
