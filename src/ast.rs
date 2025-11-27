@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     cell::UnsafeCell,
     cmp::{max, min},
-    fmt::Display,
+    fmt::{Display, Write},
     hash::{Hash, Hasher},
     iter::zip,
     ops::Range,
@@ -79,7 +79,14 @@ impl<'a> AstNode<'a> {
         semistructured: bool,
     ) -> Result<&'a Self, String> {
         let mut next_node_id = 1;
-        let root = Self::parse_root(source, None, lang_profile, arena, &mut next_node_id, semistructured)?;
+        let root = Self::parse_root(
+            source,
+            None,
+            lang_profile,
+            arena,
+            &mut next_node_id,
+            semistructured,
+        )?;
         root.internal_precompute_root_dfs(ref_arena);
         Ok(root)
     }
@@ -107,6 +114,8 @@ impl<'a> AstNode<'a> {
         let tree = parser
             .parse(source, None)
             .expect("Parsing source code failed");
+        let rendered_tree = Self::render_tree(&tree);
+        println!("{}", rendered_tree.join("\n"));
         let node_id_to_injection_lang = Self::locate_injections(&tree, source, lang_profile);
         let node_id_to_commutative_parent =
             Self::locate_commutative_parents_by_query(&tree, source, lang_profile);
@@ -126,6 +135,96 @@ impl<'a> AstNode<'a> {
             Some(range_for_root),
             semistructured,
         )
+    }
+
+    pub fn render_tree(tree: &Tree) -> Vec<String> {
+        let mut cursor = tree.walk();
+
+        let mut rows: Vec<String> = Vec::new();
+        let mut row = String::new();
+        let mut finished_row = false;
+        let mut visited_children = false;
+        let mut indent_level = 0;
+
+        loop {
+            let display_name: Option<String> = {
+                if cursor.node().is_missing() {
+                    let node = cursor.node();
+                    let node_type = if node.is_named() {
+                        node.kind().to_string()
+                    } else {
+                        format!("\"{}\"", node.kind())
+                    };
+                    Some(format!("MISSING {}", node_type))
+                } else if cursor.node().is_named() {
+                    Some(cursor.node().kind().to_string())
+                } else {
+                    // anonymous / punctuation nodes: do not display
+                    None
+                }
+            };
+
+            if visited_children {
+                if display_name.is_some() {
+                    finished_row = true;
+                }
+
+                if cursor.goto_next_sibling() {
+                    visited_children = false;
+                } else if cursor.goto_parent() {
+                    visited_children = true;
+                    indent_level -= 1;
+                } else {
+                    break;
+                }
+            } else {
+                if let Some(display_name) = display_name {
+                    if finished_row {
+                        if !row.is_empty() {
+                            rows.push(row.clone());
+                        }
+                        finished_row = false;
+                    }
+
+                    let start = cursor.node().start_position();
+                    let end = cursor.node().end_position();
+
+                    let mut field_name = cursor.field_name().unwrap_or("").to_string();
+                    if !field_name.is_empty() {
+                        field_name.push_str(": ");
+                    }
+
+                    row.clear();
+                    write!(
+                        &mut row,
+                        "{}{}{} [{}, {}] - [{}, {}]",
+                        "  ".repeat(indent_level),
+                        field_name,
+                        display_name,
+                        start.row,
+                        start.column,
+                        end.row,
+                        end.column
+                    )
+                    .unwrap();
+
+                    finished_row = true;
+                }
+
+                if cursor.goto_first_child() {
+                    visited_children = false;
+                    indent_level += 1;
+                } else {
+                    visited_children = true;
+                }
+            }
+        }
+
+        if finished_row && !row.is_empty() {
+            rows.push(row);
+        }
+
+        rows
     }
 
     /// Locate all nodes which are marked as commutative via a tree-sitter query.
@@ -253,8 +352,6 @@ impl<'a> AstNode<'a> {
             *next_node_id += 1;
             return Ok(result);
         }
-
-
 
         let atomic = lang_profile.is_atomic_node_type(node.grammar_name());
 
@@ -951,7 +1048,12 @@ impl<'a> AstNode<'a> {
     pub(crate) fn signature(&'a self) -> Option<Signature<'a, 'a>> {
         let definition = self.signature_definition()?;
 
-        if self.children.is_empty() && self.lang_profile.truncation_node_kinds.contains(self.grammar_name) {
+        if self.children.is_empty()
+            && self
+                .lang_profile
+                .truncation_node_kinds
+                .contains(self.grammar_name)
+        {
             let global_source = self.root().source;
             let mut parser = Parser::new();
 
@@ -963,24 +1065,31 @@ impl<'a> AstNode<'a> {
             if let Some(tree) = parser.parse(global_source, None) {
                 let root = tree.root_node();
 
-                let Some(target) = root.descendant_for_byte_range(self.byte_range.start, self.byte_range.end) else {
+                let Some(target) =
+                    root.descendant_for_byte_range(self.byte_range.start, self.byte_range.end)
+                else {
                     debug!("[AST DEBUG] Could not find a descendant for the given byte range.");
                     return None;
                 };
 
-                if target.start_byte() != self.byte_range.start || target.end_byte() != self.byte_range.end {
+                if target.start_byte() != self.byte_range.start
+                    || target.end_byte() != self.byte_range.end
+                {
                     debug!("[AST DEBUG] Found node does not match the exact byte range.");
                     return None;
                 }
 
                 let temp_sig = definition.extract_signature_from_ts_node(&target, global_source);
-                
-                debug!("[AST DEBUG] Extracted Signature (with descendant_for_byte_range): {}", temp_sig);
+
+                debug!(
+                    "[AST DEBUG] Extracted Signature (with descendant_for_byte_range): {}",
+                    temp_sig
+                );
 
                 let static_sig = temp_sig.to_static();
                 return Some(unsafe { std::mem::transmute(static_sig) });
             }
-          
+
             return None;
         }
 

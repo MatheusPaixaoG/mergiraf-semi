@@ -1,5 +1,5 @@
-use std::sync::LazyLock;
 use rustc_hash::FxHashSet;
+use std::sync::LazyLock;
 
 use crate::{
     lang_profile::{ChildrenGroup, CommutativeParent, LangProfile},
@@ -62,6 +62,19 @@ pub static SUPPORTED_LANGUAGES: LazyLock<Vec<LangProfile>> = LazyLock::new(|| {
     )];
 
     vec![
+        LangProfile {
+            name: "Swift", // used for the --language CLI option, and generating the list of supported languages
+            alternate_names: &["swift"], // other possible values for --language
+            extensions: vec!["swift"], // all file extensions for this language (note the lack of `.`!)
+            file_names: vec![], // the full file names which should be handled with this language
+            language: tree_sitter_swift::LANGUAGE.into(), // the tree-sitter parser
+            // optional settings, explained below
+            commutative_parents: vec![],
+            signatures: vec![],
+            atomic_nodes: vec![],
+            injections: None,
+            truncation_node_kinds: FxHashSet::default(),
+        },
         LangProfile {
             name: "Java",
             alternate_names: &[],
@@ -183,7 +196,9 @@ pub static SUPPORTED_LANGUAGES: LazyLock<Vec<LangProfile>> = LazyLock::new(|| {
                 "method_declaration",
                 "constructor_declaration",
                 "import_declaration",
-            ].into_iter().collect(),
+            ]
+            .into_iter()
+            .collect(),
         },
         LangProfile {
             name: "Java properties",
@@ -364,13 +379,9 @@ pub static SUPPORTED_LANGUAGES: LazyLock<Vec<LangProfile>> = LazyLock::new(|| {
                 signature("base_field_initializer", vec![]), // maximum one per field_initializer_list
             ],
             injections: Some(tree_sitter_rust_orchard::INJECTIONS_QUERY),
-            truncation_node_kinds: [
-                "function_item",
-                "field_declaration",
-                "use_declaration",
-            ]
-            .into_iter()
-            .collect(),
+            truncation_node_kinds: ["function_item", "field_declaration", "use_declaration"]
+                .into_iter()
+                .collect(),
         },
         LangProfile {
             name: "Go",
@@ -993,9 +1004,9 @@ pub static SUPPORTED_LANGUAGES: LazyLock<Vec<LangProfile>> = LazyLock::new(|| {
             injections: None,
             truncation_node_kinds: [
                 "method", // Method & Constructor (if name is `initialize`)
-                // Field declaration is an `assignment` to an `instance_variable`.
-                // Truncating all assignments is too broad.
-                // Import (`require`) is a `call` node, also too broad.
+                         // Field declaration is an `assignment` to an `instance_variable`.
+                         // Truncating all assignments is too broad.
+                         // Import (`require`) is a `call` node, also too broad.
             ]
             .into_iter()
             .collect(),
