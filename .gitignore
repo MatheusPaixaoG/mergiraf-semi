@@ -24,3 +24,6 @@ gumtree/
 
 # Direnv
 /.direnv
+
+# examples generated files
+examples/*/*/report/
