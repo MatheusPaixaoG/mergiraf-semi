@@ -1,0 +1,15 @@
+--- /home/matheus/Documents/UFPE/merge-and-code-review/project/mergiraf-semi/examples/swift/Calculator/expected.swift	2025-11-27 23:18:02.811235539 -0300
++++ /home/matheus/Documents/UFPE/merge-and-code-review/project/mergiraf-semi/examples/swift/Calculator/report/merged_mergiraf_semi.swift	2025-11-28 00:15:15.133336673 -0300
+@@ -1,12 +1,6 @@
+ public class Calculator {
+     private var calculator: Calculator;
+ 
+-    init() {
+-        print("Hello!")
+-        print("I am a calculator!")
+-        print("I can perform various operations.")
+-    }
+-
+     init(calculator: Calculator) {
+         print("Hello!")
+         self.calculator = calculator

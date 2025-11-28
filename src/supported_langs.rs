@@ -173,7 +173,7 @@ pub static SUPPORTED_LANGUAGES: LazyLock<Vec<LangProfile>> = LazyLock::new(|| {
                             "mutation_modifier", // mutating, nonmutating
                             "property_modifier", // static
                             "inheritance_modifier", // final
-                            "member_modifier". // convenience, required
+                            "member_modifier", // convenience, required
                         ],
                         " ",
                     ),
@@ -193,7 +193,7 @@ pub static SUPPORTED_LANGUAGES: LazyLock<Vec<LangProfile>> = LazyLock::new(|| {
                 // class_body
                 signature(
                     "property_declaration",
-                    vec![Field("name")],
+                    vec![vec![Field("name")]],
                 ),        
                 signature(
                     "function_declaration",
@@ -228,8 +228,6 @@ pub static SUPPORTED_LANGUAGES: LazyLock<Vec<LangProfile>> = LazyLock::new(|| {
                 "function_declaration",
                 "init_declaration",
                 "deinit_declaration",
-                "protocol_property_declaration",
-                "protocol_function_declaration",
                 "import_declaration",
             ].into_iter().collect(),
         },

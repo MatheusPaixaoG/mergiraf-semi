@@ -114,8 +114,8 @@ impl<'a> AstNode<'a> {
         let tree = parser
             .parse(source, None)
             .expect("Parsing source code failed");
-        let rendered_tree = Self::render_tree(&tree);
-        println!("{}", rendered_tree.join("\n"));
+        // let rendered_tree = Self::render_tree(&tree);
+        // println!("{}", rendered_tree.join("\n"));
         let node_id_to_injection_lang = Self::locate_injections(&tree, source, lang_profile);
         let node_id_to_commutative_parent =
             Self::locate_commutative_parents_by_query(&tree, source, lang_profile);
