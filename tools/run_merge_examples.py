@@ -32,7 +32,6 @@ def truncate(path: Path):
 def write_header(path: Path, message: str):
     path.write_text(f"// {message}\n")
 
-
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Run merge examples and generate reports")
     parser.add_argument("--build", action="store_true", help="Run `cargo build` at repo root before runs")
@@ -88,6 +87,43 @@ def main(argv=None):
             rprint(Panel("\n".join(log), title=f"Scenario: {scenario}", border_style="yellow"))
             continue
 
+        # 2) Try running mergiraf / mergiraf-semi
+        def run_tool(cmd_template: str, out_path: Path):
+            stderr_path = report_dir / (out_path.name + ".stderr")
+            truncate(out_path)
+            truncate(stderr_path)
+
+            # Append the left/base/right order similar to the original script
+            full_cmd = f"{cmd_template} {base} {left} {right}"
+            if args.dry_run:
+                log.append("  [dim]dry-run: not executing[/dim]")
+                return None
+
+            # Run with shell=True because cmd_template may include cd/&&
+            r = subprocess.run(full_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            return r
+
+        # 3) Compare each merged output to expected
+        def compare_and_save(merged: Path, tag: str):
+            diff_path = diffs_dir / f"{tag}.diff"
+            if not merged.exists():
+                log.append(f"  [dim]{tag}: no output produced[/dim]")
+                return "NO_OUTPUT"
+            cmd = ["diff", "-u", str(expected), str(merged)]
+            if args.dry_run:
+                log.append(f"  [dim]dry-run: {' '.join(cmd)}[/dim]")
+                return "DRY_RUN"
+            r = run(cmd, shell=False, capture_stdout=True, capture_stderr=True)
+            # write diff output even if empty to represent this run
+            diff_path.write_text(r.stdout or "")
+            if diff_path.stat().st_size > 0:
+                log.append(f"  [red]✗ {tag}: DIFFER (see {diff_path.name})[/red]")
+                return "DIFFER"
+            else:
+                log.append(f"  [green]✓ {tag}: MATCH[/green]")
+                diff_path.unlink()
+                return "MATCH"
+
         # 1) Line-based merge using git merge-file (diff3 style)
         out_diff3 = report_dir / "merged_diff3.swift"
         stderr_diff3 = report_dir / "merged_diff3.stderr"
@@ -114,42 +150,16 @@ def main(argv=None):
                 log.append(f"  [yellow]⚠ diff3 exit: {r.returncode} (conflicts in output)[/yellow]")
                 diff3_status = f"CONFLICTS (exit {r.returncode})"
 
-        # 2) Try running mergiraf / mergiraf-semi
-        def run_tool(cmd_template: str, out_path: Path):
-            stderr_path = report_dir / (out_path.name + ".stderr")
-            truncate(out_path)
-            truncate(stderr_path)
-
-            # Append the left/base/right order similar to the original script
-            full_cmd = f"{cmd_template} {base} {left} {right}"
-            log.append(f"[cyan]Running: {cmd_template.split()[0]}...[/cyan]")
-            if args.dry_run:
-                log.append("  [dim]dry-run: not executing[/dim]")
-                return None
-
-            # Run with shell=True because cmd_template may include cd/&&
-            r = subprocess.run(full_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if r.returncode == 0:
-                out_path.write_text(r.stdout or "")
-                log.append("  [green]✓ success[/green]")
-                return 0
-            else:
-                # Write stdout (may contain merge output with conflicts) to .swift file
-                out_path.write_text(r.stdout or "")
-                # Save stderr separately if there are error messages
-                if r.stderr:
-                    stderr_path.write_text(r.stderr)
-                    log.append(f"  [red]✗ failed (exit {r.returncode}), see {stderr_path.name}[/red]")
-                else:
-                    log.append(f"  [yellow]⚠ exit {r.returncode} (check output for conflicts)[/yellow]")
-                return r.returncode
+        diff3_compare = compare_and_save(out_diff3, "diff3_vs_expected")
 
         # Candidate commands (some may be compound commands)
-        candidates = [
+        candidates_mergiraf = [
             f"{repo_root}/target/debug/mergiraf merge",
             f"{repo_root}/target/debug/mergiraf",
-            "mergiraf",
-            # mergiraf-semi example invocation (project-specific)
+            "mergiraf"
+        ]
+
+        candidates_mergiraf_semi = [
             "cargo run -- merge --semistructured=diff3"
         ]
 
@@ -158,55 +168,74 @@ def main(argv=None):
 
         # Try candidates for mergiraf (stop at first success)
         mergiraf_status = "NO_OUTPUT"
-        for c in candidates:
-            rc = run_tool(c, mergiraf_out)
-            if rc == 0:
-                mergiraf_status = "SUCCESS"
-                break
-            elif rc is None:
+        for c in candidates_mergiraf:
+            log.append(f"[cyan]Running: mergiraf[/cyan]")
+            r = run_tool(c, mergiraf_out)
+            stderr_path = report_dir / (mergiraf_out.name + ".stderr")
+            if r.returncode == 0:
+                if any(marker in r.stdout for marker in ("<<<<<<<", "|||||||", "=======", ">>>>>>>")):
+                    # Write stdout (may contain merge output with conflicts) to .swift file
+                    mergiraf_out.write_text(r.stdout or "")
+                    log.append(f"  [yellow]⚠ mergiraf exit {r.returncode} (check output for conflicts)[/yellow]")
+                    mergiraf_status = f"CONFLICTS (exit {r.returncode})"
+                    break
+                else:
+                    mergiraf_out.write_text(r.stdout or "")
+                    log.append("  [green]✓ mergiraf exit: 0 (no conflicts)[/green]")
+                    mergiraf_status = "SUCCESS"
+                    break
+            elif r.returncode is None:
                 mergiraf_status = "DRY_RUN"
             else:
-                mergiraf_status = f"FAILED (exit {rc})"
+                # Write stdout (may contain merge output with conflicts) to .swift file
+                mergiraf_out.write_text(r.stdout or "")
+                # Save stderr separately if there are error messages
+                if r.stderr:
+                    stderr_path.write_text(r.stderr)
+                    log.append(f"  [red]✗ failed (exit {r.returncode}), see {stderr_path.name}[/red]")
+                else:
+                    log.append(f"  [yellow]⚠ exit {r.returncode} (check output for conflicts)[/yellow]")
+                mergiraf_status = f"FAILED (exit {r.returncode})"
+        
         if mergiraf_status.startswith("FAILED") or mergiraf_status == "NO_OUTPUT":
             log.append("[yellow]mergiraf: not found or invocation failed, skipping.[/yellow]")
 
-        # Try candidates for mergiraf-semi (same list)
+        mergiraf_compare = compare_and_save(mergiraf_out, "mergiraf_vs_expected")
+
+        # Try candidates for mergiraf-semi (stop at first success)
         mergiraf_semi_status = "NO_OUTPUT"
-        for c in candidates:
-            rc = run_tool(c, mergiraf_semi_out)
-            if rc == 0:
-                mergiraf_semi_status = "SUCCESS"
-                break
-            elif rc is None:
+        for c in candidates_mergiraf_semi:
+            log.append(f"[cyan]Running: mergiraf-semi[/cyan]")
+            r = run_tool(c, mergiraf_semi_out)
+            stderr_path = report_dir / (mergiraf_semi_out.name + ".stderr")
+            if r.returncode == 0:
+                if any(marker in r.stdout for marker in ("<<<<<<<", "|||||||", "=======", ">>>>>>>")):
+                    # Write stdout (may contain merge output with conflicts) to .swift file
+                    mergiraf_semi_out.write_text(r.stdout or "")
+                    log.append(f"  [yellow]⚠ mergiraf-semi exit {r.returncode} (check output for conflicts)[/yellow]")
+                    mergiraf_semi_status = f"CONFLICTS (exit {r.returncode})"
+                    break
+                else:
+                    mergiraf_semi_out.write_text(r.stdout or "")
+                    log.append("  [green]✓ mergiraf-semi exit: 0 (no conflicts)[/green]")
+                    mergiraf_semi_status = "SUCCESS"
+                    break
+            elif r.returncode is None:
                 mergiraf_semi_status = "DRY_RUN"
             else:
-                mergiraf_semi_status = f"FAILED (exit {rc})"
+                # Write stdout (may contain merge output with conflicts) to .swift file
+                mergiraf_semi_out.write_text(r.stdout or "")
+                # Save stderr separately if there are error messages
+                if r.stderr:
+                    stderr_path.write_text(r.stderr)
+                    log.append(f"  [red]✗ failed (exit {r.returncode}), see {stderr_path.name}[/red]")
+                else:
+                    log.append(f"  [yellow]⚠ exit {r.returncode} (check output for conflicts)[/yellow]")
+                mergiraf_semi_status = f"FAILED (exit {r.returncode})"
+
         if mergiraf_semi_status.startswith("FAILED") or mergiraf_semi_status == "NO_OUTPUT":
             log.append("[yellow]mergiraf-semi: not found or invocation failed, skipping.[/yellow]")
 
-        # 3) Compare each merged output to expected
-        def compare_and_save(merged: Path, tag: str):
-            diff_path = diffs_dir / f"{tag}.diff"
-            if not merged.exists():
-                log.append(f"  [dim]{tag}: no output produced[/dim]")
-                return "NO_OUTPUT"
-            cmd = ["diff", "-u", str(expected), str(merged)]
-            if args.dry_run:
-                log.append(f"  [dim]dry-run: {' '.join(cmd)}[/dim]")
-                return "DRY_RUN"
-            r = run(cmd, shell=False, capture_stdout=True, capture_stderr=True)
-            # write diff output even if empty to represent this run
-            diff_path.write_text(r.stdout or "")
-            if diff_path.stat().st_size > 0:
-                log.append(f"  [red]{tag}: DIFFER (see {diff_path.name})[/red]")
-                return "DIFFER"
-            else:
-                log.append(f"  [green]{tag}: MATCH[/green]")
-                diff_path.unlink()
-                return "MATCH"
-
-        diff3_compare = compare_and_save(out_diff3, "diff3_vs_expected")
-        mergiraf_compare = compare_and_save(mergiraf_out, "mergiraf_vs_expected")
         mergiraf_semi_compare = compare_and_save(mergiraf_semi_out, "mergiraf-semi_vs_expected")
 
         # Add summary table
