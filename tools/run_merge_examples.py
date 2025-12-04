@@ -121,7 +121,7 @@ def main(argv=None):
             truncate(stderr_path)
 
             # Append the left/base/right order similar to the original script
-            full_cmd = f"{cmd_template} {left} {base} {right}"
+            full_cmd = f"{cmd_template} {base} {left} {right}"
             log.append(f"[cyan]Running: {cmd_template.split()[0]}...[/cyan]")
             if args.dry_run:
                 log.append("  [dim]dry-run: not executing[/dim]")
