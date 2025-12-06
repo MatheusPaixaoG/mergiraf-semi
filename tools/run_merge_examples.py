@@ -166,42 +166,6 @@ def main(argv=None):
         mergiraf_out = report_dir / "merged_mergiraf.swift"
         mergiraf_semi_out = report_dir / "merged_mergiraf_semi.swift"
 
-        # Try candidates for mergiraf (stop at first success)
-        mergiraf_status = "NO_OUTPUT"
-        for c in candidates_mergiraf:
-            log.append(f"[cyan]Running: mergiraf[/cyan]")
-            r = run_tool(c, mergiraf_out)
-            stderr_path = report_dir / (mergiraf_out.name + ".stderr")
-            if r.returncode == 0:
-                if any(marker in r.stdout for marker in ("<<<<<<<", "|||||||", "=======", ">>>>>>>")):
-                    # Write stdout (may contain merge output with conflicts) to .swift file
-                    mergiraf_out.write_text(r.stdout or "")
-                    log.append(f"  [yellow]⚠ mergiraf exit {r.returncode} (check output for conflicts)[/yellow]")
-                    mergiraf_status = f"CONFLICTS (exit {r.returncode})"
-                    break
-                else:
-                    mergiraf_out.write_text(r.stdout or "")
-                    log.append("  [green]✓ mergiraf exit: 0 (no conflicts)[/green]")
-                    mergiraf_status = "SUCCESS"
-                    break
-            elif r.returncode is None:
-                mergiraf_status = "DRY_RUN"
-            else:
-                # Write stdout (may contain merge output with conflicts) to .swift file
-                mergiraf_out.write_text(r.stdout or "")
-                # Save stderr separately if there are error messages
-                if r.stderr:
-                    stderr_path.write_text(r.stderr)
-                    log.append(f"  [red]✗ failed (exit {r.returncode}), see {stderr_path.name}[/red]")
-                else:
-                    log.append(f"  [yellow]⚠ exit {r.returncode} (check output for conflicts)[/yellow]")
-                mergiraf_status = f"FAILED (exit {r.returncode})"
-        
-        if mergiraf_status.startswith("FAILED") or mergiraf_status == "NO_OUTPUT":
-            log.append("[yellow]mergiraf: not found or invocation failed, skipping.[/yellow]")
-
-        mergiraf_compare = compare_and_save(mergiraf_out, "mergiraf_vs_expected")
-
         # Try candidates for mergiraf-semi (stop at first success)
         mergiraf_semi_status = "NO_OUTPUT"
         for c in candidates_mergiraf_semi:
@@ -238,6 +202,42 @@ def main(argv=None):
 
         mergiraf_semi_compare = compare_and_save(mergiraf_semi_out, "mergiraf-semi_vs_expected")
 
+        # Try candidates for mergiraf (stop at first success)
+        mergiraf_status = "NO_OUTPUT"
+        for c in candidates_mergiraf:
+            log.append(f"[cyan]Running: mergiraf[/cyan]")
+            r = run_tool(c, mergiraf_out)
+            stderr_path = report_dir / (mergiraf_out.name + ".stderr")
+            if r.returncode == 0:
+                if any(marker in r.stdout for marker in ("<<<<<<<", "|||||||", "=======", ">>>>>>>")):
+                    # Write stdout (may contain merge output with conflicts) to .swift file
+                    mergiraf_out.write_text(r.stdout or "")
+                    log.append(f"  [yellow]⚠ mergiraf exit {r.returncode} (check output for conflicts)[/yellow]")
+                    mergiraf_status = f"CONFLICTS (exit {r.returncode})"
+                    break
+                else:
+                    mergiraf_out.write_text(r.stdout or "")
+                    log.append("  [green]✓ mergiraf exit: 0 (no conflicts)[/green]")
+                    mergiraf_status = "SUCCESS"
+                    break
+            elif r.returncode is None:
+                mergiraf_status = "DRY_RUN"
+            else:
+                # Write stdout (may contain merge output with conflicts) to .swift file
+                mergiraf_out.write_text(r.stdout or "")
+                # Save stderr separately if there are error messages
+                if r.stderr:
+                    stderr_path.write_text(r.stderr)
+                    log.append(f"  [red]✗ failed (exit {r.returncode}), see {stderr_path.name}[/red]")
+                else:
+                    log.append(f"  [yellow]⚠ exit {r.returncode} (check output for conflicts)[/yellow]")
+                mergiraf_status = f"FAILED (exit {r.returncode})"
+        
+        if mergiraf_status.startswith("FAILED") or mergiraf_status == "NO_OUTPUT":
+            log.append("[yellow]mergiraf: not found or invocation failed, skipping.[/yellow]")
+
+        mergiraf_compare = compare_and_save(mergiraf_out, "mergiraf_vs_expected")
+
         # Add summary table
         log.append("")
         table = Table(show_header=True, header_style="bold magenta")
@@ -247,8 +247,8 @@ def main(argv=None):
         table.add_column("Output File")
 
         table.add_row("diff3", diff3_status, diff3_compare, str(out_diff3.name))
-        table.add_row("mergiraf", mergiraf_status, mergiraf_compare, str(mergiraf_out.name))
         table.add_row("mergiraf-semi", mergiraf_semi_status, mergiraf_semi_compare, str(mergiraf_semi_out.name))
+        table.add_row("mergiraf", mergiraf_status, mergiraf_compare, str(mergiraf_out.name))
 
         log.append(f"[dim]Report saved to: {report_dir}[/dim]")
 
