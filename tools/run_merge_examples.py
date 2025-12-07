@@ -154,9 +154,7 @@ def main(argv=None):
 
         # Candidate commands (some may be compound commands)
         candidates_mergiraf = [
-            f"{repo_root}/target/debug/mergiraf merge",
-            f"{repo_root}/target/debug/mergiraf",
-            "mergiraf"
+            f"{repo_root}/target/debug/mergiraf merge"
         ]
 
         candidates_mergiraf_semi = [
