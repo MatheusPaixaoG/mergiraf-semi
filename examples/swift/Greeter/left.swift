@@ -1,9 +1,9 @@
 class Greeter {
-    func greet() -> String {
-        return "Hello!"
+    func greet(name: String) -> String {
+        return "Hello, \(name)"
     }
 
-    func greet(_ name: String) -> String {
-        return "Hello, \(name)"
+    func greet() -> String {
+        return "Hello!"
     }
 }

@@ -1,5 +1,5 @@
 class Greeter {
-    func greet(_ name: String) -> String {
+    func greet(name: String) -> String {
         return "Hello, \(name)"
     }
 }
