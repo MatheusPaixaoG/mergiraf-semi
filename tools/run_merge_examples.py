@@ -206,7 +206,7 @@ def main(argv=None):
             log.append(f"[cyan]Running: mergiraf[/cyan]")
             r = run_tool(c, mergiraf_out)
             stderr_path = report_dir / (mergiraf_out.name + ".stderr")
-            if r.returncode == 0:
+            if r.returncode == 0 or r.returncode == 1:
                 if any(marker in r.stdout for marker in ("<<<<<<<", "|||||||", "=======", ">>>>>>>")):
                     # Write stdout (may contain merge output with conflicts) to .swift file
                     mergiraf_out.write_text(r.stdout or "")
