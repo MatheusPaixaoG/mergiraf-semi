@@ -1,5 +1,5 @@
 use rustc_hash::FxHashSet;
-use std::sync::LazyLock;
+use std::{process::Child, sync::LazyLock};
 
 use crate::{
     lang_profile::{ChildrenGroup, CommutativeParent, LangProfile},
@@ -199,11 +199,12 @@ pub static SUPPORTED_LANGUAGES: LazyLock<Vec<LangProfile>> = LazyLock::new(|| {
                     "function_declaration",
                     vec![
                         vec![Field("name")],
-                        vec![
-                            Field("parameter"),
-                            ChildType("name"),
-                            Field("type_identifier"),
-                        ],                
+                        // As swift does not define the parameters as an array, we need to specify how to reach each parameter
+                        // vec![
+                        //     ChildType("parameter"),
+                        //     Field("name"),
+                        //     ChildType("type_identifier"),
+                        // ]             
                     ],
                 ),
                 // modifiers
