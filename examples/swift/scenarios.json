@@ -1,0 +1,302 @@
+{
+    "Auth": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "FAILED (exit 134)",
+            "comparison": "DIFFER"
+        }
+    },
+    "Authenticator": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "FAILED (exit 134)",
+            "comparison": "DIFFER"
+        }
+    },
+    "BankAccount": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "CONFLICTS (exit 0)",
+            "comparison": "DIFFER"
+        }
+    },
+    "Calculator1": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "SUCCESS",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "DIFFER"
+        },
+        "mergiraf-semi": {
+            "execution": "SUCCESS",
+            "comparison": "DIFFER"
+        }
+    },
+    "Calculator2": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "FAILED (exit 134)",
+            "comparison": "DIFFER"
+        }
+    },
+    "Counter": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "FAILED (exit 134)",
+            "comparison": "DIFFER"
+        }
+    },
+    "DataStore": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        }
+    },
+    "Greeter": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf-semi": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        }
+    },
+    "Logger": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        }
+    },
+    "Math": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH" // The tool report DIFFER, but is only because the order of method declarations
+        }
+    },
+    "Service": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "CONFLICTS (exit 0)",
+            "comparison": "DIFFER"
+        }
+    },
+    "Settings": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        }
+    },
+    "Sum": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "CONFLICTS (exit 0)",
+            "comparison": "DIFFER"
+        }
+    },
+    "Test": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "CONFLICTS (exit 0)",
+            "comparison": "DIFFER"
+        }
+    },
+    "conflicting_methods": {
+        "expected": "CONFLICT",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "MATCH"
+        },
+        "mergiraf": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf adds a ||| base.swift line)
+        },
+        "mergiraf-semi": {
+            "execution": "CONFLICTS (exit 0)",
+            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf-semi shows a conflict in the entire function)
+        }
+    },
+    "conflicting_property_initialization": {
+        "expected": "CONFLICT",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "MATCH"
+        },
+        "mergiraf": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf adds a ||| base.swift line)
+        },
+        "mergiraf-semi": {
+            "execution": "CONFLICTS (exit 0)",
+            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf-semi adds a ||| base.swift line)
+        }
+    },
+    "conflicting_property_initialization_2": {
+        "expected": "CONFLICT",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "MATCH"
+        },
+        "mergiraf": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf adds a ||| base.swift line)
+        },
+        "mergiraf-semi": {
+            "execution": "FAILED (exit 134)",
+            "comparison": "DIFFER"
+        }
+    },
+    "conflicting_protocol_implementation": {
+        "expected": "CONFLICT",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "MATCH"
+        },
+        "mergiraf": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf shows a conflict in the entire function)
+        },
+        "mergiraf-semi": {
+            "execution": "CONFLICTS (exit 0)",
+            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf-semi shows a conflict in the entire function)
+        }
+    },
+    "enum_cases": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        }
+    },
+    "property_observers": {
+        "expected": "SUCCESS",
+        "diff3": {
+            "execution": "CONFLICTS (exit 1)",
+            "comparison": "DIFFER"
+        },
+        "mergiraf": {
+            "execution": "SUCCESS",
+            "comparison": "MATCH"
+        },
+        "mergiraf-semi": {
+            "execution": "CONFLICTS (exit 0)",
+            "comparison": "DIFFER"
+        }
+    }
+}

@@ -14,13 +14,11 @@ class Circle: Drawable {
         print("Drawing circle")
     }
     
+    func erase() {
 <<<<<<< left.swift
-    func erase() {
         print("Erasing with background color")
-    }
 =======
-    func erase() {
         print("Clearing circle area")
-    }
 >>>>>>> right.swift
+    }
 }
