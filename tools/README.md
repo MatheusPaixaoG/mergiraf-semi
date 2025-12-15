@@ -1,6 +1,14 @@
-Run merge examples and generate reports
+# Merge Tools Testing Scripts
 
-## Usage
+This directory contains Python scripts for testing and analyzing merge tool performance on Swift code examples.
+
+## Scripts
+
+### 1. run_merge_examples.py
+
+Runs merge tools on all Swift scenarios and generates detailed reports.
+
+#### Usage
 
 From the project root run:
 
@@ -8,12 +16,12 @@ From the project root run:
 python3 tools/run_merge_examples.py [--build] [--dry-run]
 ```
 
-### Options
+#### Options
 
 - `--build`: Run `cargo build` before executing merge scenarios
 - `--dry-run`: Print commands without executing them
 
-## What the script does
+#### What the script does
 
 For each scenario folder under `examples/swift/`:
 
@@ -38,7 +46,9 @@ For each scenario folder under `examples/swift/`:
    - Summary table with run status and compare results
    - Color-coded output (green ✓ for success, yellow ⚠ for conflicts, red ✗ for failures)
 
-## Output structure
+6. **Generates confusion matrices**: Displays TP, TN, FP, FN, and error counts for each tool by reading from `scenarios.json`
+
+#### Output structure
 
 Each scenario creates:
 ```
@@ -56,15 +66,81 @@ examples/swift/<scenario>/
 │       └── mergiraf-semi_vs_expected.diff
 ```
 
+---
+
+### 2. compute_comparison_metrics.py
+
+Analyzes results from `scenarios.json` and computes pairwise comparison metrics between merge tools.
+
+#### Usage
+
+From the project root run:
+
+```bash
+python3 tools/compute_comparison_metrics.py [--debug]
+```
+
+#### Options
+
+- `--debug`: Enable detailed debug output showing scenario-by-scenario analysis and divergence detection
+
+#### What the script does
+
+1. **Reads scenarios.json**: Loads expected results and actual tool outputs for all scenarios
+2. **Generates confusion matrices**: Displays TP (True Positive), TN (True Negative), FP (False Positive), FN (False Negative), and error counts for each tool
+3. **Computes pairwise comparisons**: Analyzes tool pairs (e.g., diff3 vs mergiraf) to calculate:
+   - **aTP** (Additional True Positives): Cases where tool A correctly detected a conflict but tool B didn't
+   - **aTN** (Additional True Negatives): Cases where tool A correctly merged but tool B didn't
+   - **aFP** (Additional False Positives): Cases where tool A incorrectly reported a conflict but tool B was correct
+   - **aFN** (Additional False Negatives): Cases where tool A missed a conflict but tool B detected it
+4. **Displays detailed tables**: Shows metric counts and the specific scenarios contributing to each metric
+
+#### Output
+
+- **Without --debug**: Shows only summary tables with confusion matrices and comparison metrics
+- **With --debug**: Includes detailed messages for each scenario showing:
+  - When tools produce different results
+  - Which tool produced the expected output
+  - Execution status and comparison results for each divergence
+
+---
+
 ## Requirements
 
 - **Required**: `git` (for `git merge-file` command)
-- **Required**: Python 3 with `rich` library (`pip3 install rich`)
-- **Optional**: `mergiraf` and `mergiraf-semi` binaries (script will skip if not found)
+- **Required**: Python 3.7+ with `rich` library (`pip install rich`)
+- **Optional**: `mergiraf` and `mergiraf-semi` binaries (run_merge_examples.py will skip if not found)
+
+## scenarios.json Format
+
+The `examples/swift/scenarios.json` file is a manually created ground truth file that contains expected results and tool execution outcomes. This file should be populated based on the output provided by `run_merge_examples.py` after running the scenarios.
+
+Format:
+
+```json
+{
+  "scenario_name": {
+    "expected": "CONFLICT" or "SUCCESS",
+    "diff3": {
+      "execution": "SUCCESS" | "CONFLICTS (exit N)" | "FAILED (exit N)",
+      "comparison": "MATCH" | "DIFFER"
+    },
+    "mergiraf": { ... },
+    "mergiraf-semi": { ... }
+  }
+}
+```
+
+## Workflow
+
+1. **Run scenarios**: `python3 tools/run_merge_examples.py --build`
+2. **Analyze results**: `python3 tools/compute_comparison_metrics.py`
+3. **Debug issues**: `python3 tools/compute_comparison_metrics.py --debug`
 
 ## Notes
 
-- The script always overwrites output files to reflect the latest run
+- The scripts always overwrite output files to reflect the latest run
 - Merge outputs are written as `.swift` files even when merges fail (to preserve conflict markers or partial results)
 - Stderr is saved separately in `.stderr` files for diagnostic purposes
 - Empty diff files are automatically removed (indicating a MATCH)
+- Conflict markers use relative filenames (e.g., `left.swift`) instead of full paths
