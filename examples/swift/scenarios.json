@@ -146,7 +146,7 @@
         },
         "mergiraf-semi": {
             "execution": "SUCCESS",
-            "comparison": "MATCH" // The tool report DIFFER, but is only because the order of method declarations
+            "comparison": "MATCH"
         }
     },
     "Service": {
@@ -217,11 +217,11 @@
         },
         "mergiraf": {
             "execution": "CONFLICTS (exit 1)",
-            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf adds a ||| base.swift line)
+            "comparison": "MATCH"
         },
         "mergiraf-semi": {
             "execution": "CONFLICTS (exit 0)",
-            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf-semi shows a conflict in the entire function)
+            "comparison": "MATCH"
         }
     },
     "conflicting_property_initialization": {
@@ -232,11 +232,11 @@
         },
         "mergiraf": {
             "execution": "CONFLICTS (exit 1)",
-            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf adds a ||| base.swift line)
+            "comparison": "MATCH"
         },
         "mergiraf-semi": {
             "execution": "CONFLICTS (exit 0)",
-            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf-semi adds a ||| base.swift line)
+            "comparison": "MATCH"
         }
     },
     "conflicting_property_initialization_2": {
@@ -247,7 +247,7 @@
         },
         "mergiraf": {
             "execution": "CONFLICTS (exit 1)",
-            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf adds a ||| base.swift line)
+            "comparison": "MATCH"
         },
         "mergiraf-semi": {
             "execution": "FAILED (exit 134)",
@@ -262,11 +262,11 @@
         },
         "mergiraf": {
             "execution": "CONFLICTS (exit 1)",
-            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf shows a conflict in the entire function)
+            "comparison": "MATCH"
         },
         "mergiraf-semi": {
             "execution": "CONFLICTS (exit 0)",
-            "comparison": "MATCH" // The tool report DIFFER, but is only because the scope of the conflict (mergiraf-semi shows a conflict in the entire function)
+            "comparison": "MATCH"
         }
     },
     "enum_cases": {
