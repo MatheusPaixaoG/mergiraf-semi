@@ -2,7 +2,7 @@
     "Auth": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -17,7 +17,7 @@
     "Authenticator": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -32,7 +32,7 @@
     "BankAccount": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -40,7 +40,7 @@
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "CONFLICTS (exit 0)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         }
     },
@@ -62,7 +62,7 @@
     "Calculator2": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -77,7 +77,7 @@
     "Counter": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -92,7 +92,7 @@
     "DataStore": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -111,7 +111,7 @@
             "comparison": "MATCH"
         },
         "mergiraf": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf-semi": {
@@ -137,7 +137,7 @@
     "Math": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -152,7 +152,7 @@
     "Service": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -160,7 +160,7 @@
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "CONFLICTS (exit 0)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         }
     },
@@ -182,7 +182,7 @@
     "Sum": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -190,14 +190,14 @@
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "CONFLICTS (exit 0)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         }
     },
     "Test": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -205,48 +205,48 @@
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "CONFLICTS (exit 0)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         }
     },
     "conflicting_methods": {
         "expected": "CONFLICT",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         },
         "mergiraf": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "CONFLICTS (exit 0)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         }
     },
     "conflicting_property_initialization": {
         "expected": "CONFLICT",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         },
         "mergiraf": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "CONFLICTS (exit 0)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         }
     },
     "conflicting_property_initialization_2": {
         "expected": "CONFLICT",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         },
         "mergiraf": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
@@ -257,22 +257,22 @@
     "conflicting_protocol_implementation": {
         "expected": "CONFLICT",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         },
         "mergiraf": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "CONFLICTS (exit 0)",
+            "execution": "CONFLICT",
             "comparison": "MATCH"
         }
     },
     "enum_cases": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -287,7 +287,7 @@
     "property_observers": {
         "expected": "SUCCESS",
         "diff3": {
-            "execution": "CONFLICTS (exit 1)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         },
         "mergiraf": {
@@ -295,7 +295,7 @@
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "CONFLICTS (exit 0)",
+            "execution": "CONFLICT",
             "comparison": "DIFFER"
         }
     }
