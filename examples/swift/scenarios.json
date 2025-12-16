@@ -10,7 +10,7 @@
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "FAILED (exit 134)",
+            "execution": "FAILED",
             "comparison": "DIFFER"
         }
     },
@@ -25,7 +25,7 @@
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "FAILED (exit 134)",
+            "execution": "FAILED",
             "comparison": "DIFFER"
         }
     },
@@ -70,7 +70,7 @@
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "FAILED (exit 134)",
+            "execution": "FAILED",
             "comparison": "DIFFER"
         }
     },
@@ -85,7 +85,7 @@
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "FAILED (exit 134)",
+            "execution": "FAILED",
             "comparison": "DIFFER"
         }
     },
@@ -250,7 +250,7 @@
             "comparison": "MATCH"
         },
         "mergiraf-semi": {
-            "execution": "FAILED (exit 134)",
+            "execution": "FAILED",
             "comparison": "DIFFER"
         }
     },
